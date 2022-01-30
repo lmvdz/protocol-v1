@@ -99,7 +99,6 @@ export class PollingAccountSubscriber {
                 flattenedAccounts[i]['publicKey'] = publicKey;
                 flattenedAccounts[i]['accounts'] = [...accountMap.values()];
                 flattenedAccounts[i]['accountPublicKeys'] = [...accountMap.values()].map(acc => acc.accountPublicKey);
-                flattenedAccounts[i]['accountCount'] = flattenedAccounts[i]['accountPublicKeys'].length;
             });
 
             if (Object.keys(flattenedAccounts).length > 0) {
@@ -153,7 +152,7 @@ export class PollingAccountSubscriber {
                                 newValue.onPoll(account);
                             }
                         }
-                        index += flattenedAccounts[key]['accountCount'];
+                        index += flattenedAccounts[key]['accounts'].length;
                     }
                 } else {
                     const accounts = [
