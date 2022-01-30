@@ -14,7 +14,6 @@ const MAX_KEYS = 100;
 export class PollingAccountSubscriber {
     isSubscribed: boolean;
 	program: Program;
-	lastSlot: number;
 	pollingFrequency: number;
 	intervalId?: NodeJS.Timer;
 
