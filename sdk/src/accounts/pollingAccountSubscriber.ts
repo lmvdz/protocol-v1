@@ -24,6 +24,10 @@ export class PollingAccountSubscriber {
 
     private pollingAccountMap : Map<string, Map<string, AccountToPoll<any>>> = new Map<string, Map<string, AccountToPoll<any>>>();
 
+    getAllKeys() : Array<string> {
+        return [...this.pollingAccountMap.keys()];
+    }
+
     hasAccount(publicKey: string) : boolean {
         return this.pollingAccountMap.has(publicKey);
     }
