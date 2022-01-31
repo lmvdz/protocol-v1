@@ -94,14 +94,16 @@ export class PollingAccountSubscriber {
 
 	async pollAccounts(): Promise<void> {
         const flattenedAccounts = {};
-
         if (this.pollingAccountMap.size > 0) {
 
             [...this.pollingAccountMap].forEach(([publicKey, accountMap], i) => {
-                flattenedAccounts[i] = {};
-                flattenedAccounts[i]['publicKey'] = publicKey;
-                flattenedAccounts[i]['accounts'] = [...accountMap.values()];
-                flattenedAccounts[i]['accountPublicKeys'] = [...accountMap.values()].map(acc => acc.accountPublicKey);
+                if (publicKey && accountMap) {
+                    flattenedAccounts[i] = {
+                        publicKey,
+                        accounts: [...accountMap.values()],
+                        accountPublicKeys: [...accountMap.values()].map(acc => acc.accountPublicKey)
+                    };
+                }
             });
 
             if (Object.keys(flattenedAccounts).length > 0) {
@@ -144,15 +146,18 @@ export class PollingAccountSubscriber {
                                 this.capitalize(flattenedAccounts[key]['accounts'][x].accountKey),
                                 buffer
                             );
+                                
+                            if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
+                                const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
             
-                            
-                            const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
-            
-                            const newValue = { ...oldValue, slot, data: account, raw };
-            
-                            if (oldValue === undefined || oldValue.slot < newValue.slot && oldValue.data !== newValue.data) {
-                                this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
-                                newValue.onPoll(account);
+                                const newValue = { ...oldValue, slot, data: account, raw };
+                
+                                if (oldValue === undefined || oldValue.slot < newValue.slot && oldValue.data !== newValue.data) {
+                                    this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
+                                    newValue.onPoll(account);
+                                }
+                            } else {
+                                accounts[x].onPoll(account);
                             }
                         }
                         index += flattenedAccounts[key]['accounts'].length;
@@ -186,22 +191,21 @@ export class PollingAccountSubscriber {
                                 buffer
                             );
             
-                            
-                            const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
+                            if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
+                                const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
             
-                            const newValue = { ...oldValue, slot, data: account, raw };
-            
-                            if (oldValue === undefined || oldValue.slot < newValue.slot && oldValue.data !== newValue.data) {
-                                this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
-                                newValue.onPoll(account);
+                                const newValue = { ...oldValue, slot, data: account, raw };
+                
+                                if (oldValue === undefined || oldValue.slot < newValue.slot && oldValue.data !== newValue.data) {
+                                    this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
+                                    newValue.onPoll(account);
+                                }
+                            } else {
+                                accounts[x].onPoll(account);
                             }
                         }
-                        
                     });
-
-
                 }
-                
             }
         }
 	}
