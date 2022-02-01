@@ -151,8 +151,9 @@ export class PollingAccountSubscriber {
                                 const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
             
                                 const newValue = { ...oldValue, slot, data: account, raw };
-                
-                                if (oldValue === undefined || oldValue.slot < newValue.slot && oldValue.data !== newValue.data) {
+                                // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
+                                if (oldValue === undefined || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.data !== newValue.data)) {
+                                    // console.log('polled');
                                     this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
                                     newValue.onPoll(account);
                                 }
@@ -195,8 +196,9 @@ export class PollingAccountSubscriber {
                                 const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
             
                                 const newValue = { ...oldValue, slot, data: account, raw };
-                
-                                if (oldValue === undefined || oldValue.slot < newValue.slot && oldValue.data !== newValue.data) {
+                                // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
+                                if (oldValue === undefined || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.data !== newValue.data)) {
+                                    // console.log('polled');
                                     this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
                                     newValue.onPoll(account);
                                 }
