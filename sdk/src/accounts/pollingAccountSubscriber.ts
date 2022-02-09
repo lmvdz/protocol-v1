@@ -1,6 +1,6 @@
 import { Program } from '@project-serum/anchor';
 
-export interface AccountToPoll<T> {
+interface AccountToPoll<T> {
     accountKey: string,
     accountPublicKey: string,
     onPoll: (data: any) => void
