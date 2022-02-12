@@ -10,7 +10,7 @@ interface AccountToPoll<T> {
     data: T
 }
 
-const MAX_KEYS = 10;
+const MAX_KEYS = 100;
 
 export class PollingAccountSubscriber {
     isSubscribed: boolean;
@@ -139,7 +139,7 @@ export class PollingAccountSubscriber {
                                 //     'getMultipleAccounts',
                                 //     accounts
                                 // ).then(data => resolve(data));
-                            }, 2000 * (index + 1) * (this.index + 1));
+                            }, 3000 * (index + 1) * (this.index + 1));
                         });
                     }));
                     let index = 0;
