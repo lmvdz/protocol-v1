@@ -1,4 +1,5 @@
 import { Program } from '@project-serum/anchor';
+import axios from 'axios';
 
 interface AccountToPoll<T> {
     accountKey: string,
@@ -9,16 +10,18 @@ interface AccountToPoll<T> {
     data: T
 }
 
-const MAX_KEYS = 100;
+const MAX_KEYS = 10;
 
 export class PollingAccountSubscriber {
     isSubscribed: boolean;
 	program: Program;
 	pollingFrequency: number;
 	intervalId?: NodeJS.Timer;
+    index: number
 
-	public constructor(program: Program, pollingFrequency = 1000) {
+	public constructor(program: Program, index: number, pollingFrequency = 1000) {
 		this.program = program;
+        this.index = index;
 		this.pollingFrequency = pollingFrequency;
 	}
 
@@ -90,7 +93,7 @@ export class PollingAccountSubscriber {
 
     chunkArray(array : Array<any>, chunk_size : number) : Array<any> {
         return new Array(Math.ceil(array.length / chunk_size)).fill(null).map((_, index) => index * chunk_size).map(begin => array.slice(begin, begin + chunk_size));
-    } 
+    }
 
 	async pollAccounts(): Promise<void> {
         const flattenedAccounts = {};
@@ -110,16 +113,34 @@ export class PollingAccountSubscriber {
                 let allkeys = this.flatDeep(Object.keys(flattenedAccounts).map(key => flattenedAccounts[key]['accountPublicKeys']), Infinity);
                 if (allkeys.length > MAX_KEYS) {
                     allkeys = this.chunkArray(allkeys, MAX_KEYS);
-                    const rpcResponses = await Promise.all(allkeys.map(async chunk => {
-                        const accounts = [
-                            chunk,
-                            { commitment: 'recent' },
-                        ];
-                        // @ts-ignore
-                        return (await this.program.provider.connection._rpcRequest(
-                            'getMultipleAccounts',
-                            accounts
-                        ));
+                    const rpcResponses = await Promise.all(allkeys.map((chunk, index) => {
+                        return new Promise((resolve) => {
+                            setTimeout(() => {
+                                // const accounts = [
+                                //     chunk,
+                                //     { commitment: 'processed' },
+                                // ];
+                                // @ts-ignore
+                                axios.post(this.program.provider.connection._rpcEndpoint, [{
+                                    jsonrpc: "2.0",
+                                    id: "1",
+                                    method: "getMultipleAccounts",
+                                    params: [
+                                        chunk,
+                                      {
+                                        commitment: "processed",
+                                      },
+                                    ],
+                                }]).then(response => {
+                                    resolve(response.data[0]);
+                                });
+                                // @ts-ignore
+                                // this.program.provider.connection._rpcRequest(
+                                //     'getMultipleAccounts',
+                                //     accounts
+                                // ).then(data => resolve(data));
+                            }, 2000 * (index + 1) * (this.index + 1));
+                        });
                     }));
                     let index = 0;
                     for (let x = 0; x < Object.keys(flattenedAccounts).length; x++) {
@@ -127,16 +148,16 @@ export class PollingAccountSubscriber {
                         const accounts = flattenedAccounts[key]['accounts'];
                         const rpcResponseIndex = Math.floor(index / MAX_KEYS);
                         const rpcResponse = rpcResponses[rpcResponseIndex];
-                        const slot = rpcResponse.result.context.slot;
+                        const slot = (rpcResponse as any).result.context.slot;
 
                         for (let x = 0; x < accounts.length; x++) {
                             
                             let accIndex = index;
-                            while (accIndex >= 100) {
-                                accIndex -= 100;
+                            while (accIndex >= MAX_KEYS) {
+                                accIndex -= MAX_KEYS;
                             }
-                            const raw: string = rpcResponse.result.value[ accIndex + x ].data[0];
-                            const dataType = rpcResponse.result.value[ accIndex + x ].data[1];
+                            const raw: string = (rpcResponse as any).result.value[ accIndex + x ].data[0];
+                            const dataType = (rpcResponse as any).result.value[ accIndex + x ].data[1];
                             const buffer = Buffer.from(raw, dataType);
                             
                             const account = this.program.account[
@@ -163,16 +184,27 @@ export class PollingAccountSubscriber {
                         index += flattenedAccounts[key]['accounts'].length;
                     }
                 } else {
-                    const accounts = [
-                        allkeys,
-                        { commitment: 'recent' },
-                    ];
+                    // const accounts = [
+                    //     allkeys,
+                    //     { commitment: 'processed' },
+                    // ];
                 
                     // @ts-ignore
-                    const rpcResponse = await this.program.provider.connection._rpcRequest(
-                        'getMultipleAccounts',
-                        accounts
-                    );
+                    // const rpcResponse = await this.program.provider.connection._rpcRequest(
+                    //     'getMultipleAccounts',
+                    //     accounts
+                    // );
+                    const rpcResponse = (await axios.post(this.program.provider.connection._rpcEndpoint, [{
+                        jsonrpc: "2.0",
+                        id: "1",
+                        method: "getMultipleAccounts",
+                        params: [
+                            allkeys,
+                          {
+                            commitment: "processed",
+                          },
+                        ],
+                    }])).data[0];
                     const slot = rpcResponse.result.context.slot;
 
                     let index = 0;
