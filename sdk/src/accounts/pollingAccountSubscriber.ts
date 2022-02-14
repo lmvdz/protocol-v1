@@ -131,7 +131,7 @@ export class PollingAccountSubscriber {
 
                     const payloads = this.chunkArray(chunkedKeys, 10);
 
-                    const requests = this.chunkArray(payloads, 10);
+                    const requests = this.chunkArray(payloads, 5);
 
                     const rpcResponses = this.flatDeep(
                         await Promise.all(
@@ -155,7 +155,7 @@ export class PollingAccountSubscriber {
                                             )), 
                                             Infinity
                                         ));
-                                    }, index * 1.5 * 1000);
+                                    }, index * 1000);
                                 })
                             )
                         ),
