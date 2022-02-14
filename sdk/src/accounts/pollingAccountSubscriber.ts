@@ -2,11 +2,12 @@ import { Program } from '@project-serum/anchor';
 import axios from 'axios';
 
 interface AccountToPoll<T> {
-    accountKey: string,
-    accountPublicKey: string,
+    accountKey: string
+    accountPublicKey: string
     onPoll: (data: any) => void
-    slot: number,
+    slot: number
     raw: string
+    dataType: BufferEncoding
     data: T
 }
 
@@ -18,8 +19,10 @@ export class PollingAccountSubscriber {
 	pollingFrequency: number;
 	intervalId?: NodeJS.Timer;
     index: number
+    name: string
 
-	public constructor(program: Program, index: number, pollingFrequency = 1000) {
+	public constructor(name: string, program: Program, index: number, pollingFrequency = 1000) {
+        this.name = name;
 		this.program = program;
         this.index = index;
 		this.pollingFrequency = pollingFrequency;
@@ -68,7 +71,8 @@ export class PollingAccountSubscriber {
             if (this.intervalId) {
                 clearInterval(this.intervalId);
             }
-            this.intervalId = setInterval(this.pollAccounts.bind(this), this.pollingFrequency);
+            this.intervalId = setInterval(() => this.pollAccounts(), this.pollingFrequency);
+            console.log(this.name + ' subscribed');
             this.isSubscribed = true;
         }
     }
@@ -79,6 +83,7 @@ export class PollingAccountSubscriber {
                 clearInterval(this.intervalId);
             }
             this.isSubscribed = false;
+            console.log(this.name + ' unsubscribed');
             this.clean();
         }
     }
@@ -95,11 +100,20 @@ export class PollingAccountSubscriber {
         return new Array(Math.ceil(array.length / chunk_size)).fill(null).map((_, index) => index * chunk_size).map(begin => array.slice(begin, begin + chunk_size));
     }
 
+    constructAccount(accountKey: string, raw: string, dataType: BufferEncoding) : any {
+        return this.program.account[
+            accountKey
+        ].coder.accounts.decode(
+            this.capitalize(accountKey),
+            Buffer.from(raw, dataType)
+        );
+    }
+
 	async pollAccounts(): Promise<void> {
         const flattenedAccounts = {};
         if (this.pollingAccountMap.size > 0) {
 
-            [...this.pollingAccountMap].forEach(([publicKey, accountMap], i) => {
+            await Promise.all([...this.pollingAccountMap].map(([publicKey, accountMap], i) => {
                 if (publicKey && accountMap) {
                     flattenedAccounts[i] = {
                         publicKey,
@@ -107,38 +121,47 @@ export class PollingAccountSubscriber {
                         accountPublicKeys: [...accountMap.values()].map(acc => acc.accountPublicKey)
                     };
                 }
-            });
+            }));
+
 
             if (Object.keys(flattenedAccounts).length > 0) {
-                let allkeys = this.flatDeep(Object.keys(flattenedAccounts).map(key => flattenedAccounts[key]['accountPublicKeys']), Infinity);
+                const allkeys = this.flatDeep(Object.keys(flattenedAccounts).map(key => flattenedAccounts[key]['accountPublicKeys']), Infinity);
                 if (allkeys.length > MAX_KEYS) {
-                    allkeys = this.chunkArray(allkeys, MAX_KEYS);
-                    const rpcResponses = await Promise.all(allkeys.map((chunk, index) => {
-                        const axioRequest = (resolve) => {
-                            setTimeout(() => {
-                                //@ts-ignore
-                                axios.post(this.program.provider.connection._rpcEndpoint, [{
-                                    jsonrpc: "2.0",
-                                    id: "1",
-                                    method: "getMultipleAccounts",
-                                    params: [
-                                        chunk,
-                                    {
-                                        commitment: "processed",
-                                    },
-                                    ],
-                                }]).then(response => {
-                                    resolve(response.data[0]);
-                                }).catch(error => {
-                                    console.error(error);
-                                    axioRequest(resolve);
-                                });
-                            }, 5000 * (index + 1) * (this.index + 1));
-                        };
-                        return new Promise((resolve) => {
-                            axioRequest(resolve);
-                        });
-                    }));
+                    const chunkedKeys = this.chunkArray(allkeys, MAX_KEYS);
+
+                    const payloads = this.chunkArray(chunkedKeys, 10);
+
+                    const requests = this.chunkArray(payloads, 10);
+
+                    const rpcResponses = this.flatDeep(
+                        await Promise.all(
+                            requests.map((request, index) => 
+                                new Promise((resolve) => {
+                                    setTimeout(async () => {
+                                        resolve(this.flatDeep(
+                                            await Promise.all(request.map(async (requestChunk) => 
+                                                //@ts-ignore 
+                                                (await axios.post(this.program.provider.connection._rpcEndpoint, requestChunk.map(payload => 
+                                                    ({
+                                                        jsonrpc: "2.0",
+                                                        id: "1",
+                                                        method: "getMultipleAccounts",
+                                                        params: [
+                                                            payload,
+                                                            { commitment: "processed", },
+                                                        ]
+                                                    })
+                                                ))).data
+                                            )), 
+                                            Infinity
+                                        ));
+                                    }, index * 1.5 * 1000);
+                                })
+                            )
+                        ),
+                        Infinity
+                    );
+
                     let index = 0;
                     for (let x = 0; x < Object.keys(flattenedAccounts).length; x++) {
                         const key =  Object.keys(flattenedAccounts)[x];
@@ -154,22 +177,14 @@ export class PollingAccountSubscriber {
                                 accIndex -= MAX_KEYS;
                             }
                             const raw: string = (rpcResponse as any).result.value[ accIndex + x ].data[0];
-                            const dataType = (rpcResponse as any).result.value[ accIndex + x ].data[1];
-                            const buffer = Buffer.from(raw, dataType);
-                            
-                            const account = this.program.account[
-                                flattenedAccounts[key]['accounts'][x].accountKey
-                            ].coder.accounts.decode(
-                                this.capitalize(flattenedAccounts[key]['accounts'][x].accountKey),
-                                buffer
-                            );
+                            const dataType = (rpcResponse as any).result.value[ accIndex + x ].data[1] as BufferEncoding;
+                            const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
                                 
                             if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
-                                const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey);
-            
-                                const newValue = { ...oldValue, slot, data: account, raw };
+                                const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey );
+                                const newValue = { ...oldValue, slot, data: account, raw, dataType };
                                 // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
-                                if (oldValue === undefined || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.data !== newValue.data)) {
+                                if ( oldValue.data === null || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.raw !== newValue.raw )) {
                                     // console.log('polled');
                                     this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
                                     newValue.onPoll(account);
@@ -181,16 +196,7 @@ export class PollingAccountSubscriber {
                         index += flattenedAccounts[key]['accounts'].length;
                     }
                 } else {
-                    // const accounts = [
-                    //     allkeys,
-                    //     { commitment: 'processed' },
-                    // ];
-                
-                    // @ts-ignore
-                    // const rpcResponse = await this.program.provider.connection._rpcRequest(
-                    //     'getMultipleAccounts',
-                    //     accounts
-                    // );
+                    //@ts-ignore
                     const rpcResponse = (await axios.post(this.program.provider.connection._rpcEndpoint, [{
                         jsonrpc: "2.0",
                         id: "1",
@@ -211,21 +217,15 @@ export class PollingAccountSubscriber {
     
                         for (let x = 0; x < accounts.length; x++) {
                             const raw: string = rpcResponse.result.value[ index + x ].data[0];
-                            const dataType = rpcResponse.result.value[ index + x ].data[1];
-                            const buffer = Buffer.from(raw, dataType);
-            
-                            const account = this.program.account[
-                                flattenedAccounts[key]['accounts'][x].accountKey
-                            ].coder.accounts.decode(
-                                this.capitalize(flattenedAccounts[key]['accounts'][x].accountKey),
-                                buffer
-                            );
+                            const dataType = rpcResponse.result.value[ index + x ].data[1] as BufferEncoding;
+                            const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
+                            
                             if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
                                 const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( accounts[x].accountKey );
             
-                                const newValue = { ...oldValue, slot, data: account, raw };
+                                const newValue = { ...oldValue, slot, data: account, raw, dataType };
                                 // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
-                                if (oldValue === undefined || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.data !== newValue.data)) {
+                                if (oldValue.data === null || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.raw !== newValue.raw)) {
                                     // console.log('polled');
                                     this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set( accounts[x].accountKey, newValue );
                                     newValue.onPoll(account);
