@@ -114,32 +114,29 @@ export class PollingAccountSubscriber {
                 if (allkeys.length > MAX_KEYS) {
                     allkeys = this.chunkArray(allkeys, MAX_KEYS);
                     const rpcResponses = await Promise.all(allkeys.map((chunk, index) => {
-                        return new Promise((resolve) => {
+                        const axioRequest = (resolve) => {
                             setTimeout(() => {
-                                // const accounts = [
-                                //     chunk,
-                                //     { commitment: 'processed' },
-                                // ];
-                                // @ts-ignore
+                                //@ts-ignore
                                 axios.post(this.program.provider.connection._rpcEndpoint, [{
                                     jsonrpc: "2.0",
                                     id: "1",
                                     method: "getMultipleAccounts",
                                     params: [
                                         chunk,
-                                      {
+                                    {
                                         commitment: "processed",
-                                      },
+                                    },
                                     ],
                                 }]).then(response => {
                                     resolve(response.data[0]);
+                                }).catch(error => {
+                                    console.error(error);
+                                    axioRequest(resolve);
                                 });
-                                // @ts-ignore
-                                // this.program.provider.connection._rpcRequest(
-                                //     'getMultipleAccounts',
-                                //     accounts
-                                // ).then(data => resolve(data));
-                            }, 3000 * (index + 1) * (this.index + 1));
+                            }, 5000 * (index + 1) * (this.index + 1));
+                        };
+                        return new Promise((resolve) => {
+                            axioRequest(resolve);
                         });
                     }));
                     let index = 0;
