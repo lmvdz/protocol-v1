@@ -1,6 +1,6 @@
 {
 	"name": "@drift-labs/sdk",
-	"version": "0.1.21-master.0",
+	"version": "0.1.22",
 	"main": "lib/index.js",
 	"types": "lib/index.d.ts",
 	"author": "crispheaney",
@@ -44,5 +44,8 @@
 	"description": "SDK for Drift Protocol v1",
 	"engines": {
 		"node": ">=12"
+	},
+	"devDependencies": {
+		"typescript": "^4.5.5"
 	}
 }
