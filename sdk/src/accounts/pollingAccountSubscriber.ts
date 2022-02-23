@@ -166,11 +166,12 @@ export class PollingAccountSubscriber {
                     for (let x = 0; x < Object.keys(flattenedAccounts).length; x++) {
                         const key =  Object.keys(flattenedAccounts)[x];
                         const accounts = flattenedAccounts[key]['accounts'];
-                        const rpcResponseIndex = Math.floor(index / MAX_KEYS);
-                        const rpcResponse = rpcResponses[rpcResponseIndex];
-                        const slot = (rpcResponse as any).result.context.slot;
 
                         for (let x = 0; x < accounts.length; x++) {
+
+                            const rpcResponseIndex = Math.floor((index + x) / MAX_KEYS);
+                            const rpcResponse = rpcResponses[rpcResponseIndex];
+                            const slot = (rpcResponse as any).result.context.slot;
                             
                             let accIndex = index;
                             while (accIndex >= MAX_KEYS) {
