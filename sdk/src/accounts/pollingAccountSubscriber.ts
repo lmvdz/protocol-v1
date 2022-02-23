@@ -113,7 +113,7 @@ export class PollingAccountSubscriber {
         const flattenedAccounts = {};
         if (this.pollingAccountMap.size > 0) {
 
-            await Promise.all([...this.pollingAccountMap].map(([publicKey, accountMap], i) => {
+            await Promise.all([...this.pollingAccountMap].map(async ([publicKey, accountMap], i) => {
                 if (publicKey && accountMap) {
                     flattenedAccounts[i] = {
                         publicKey,
@@ -138,10 +138,11 @@ export class PollingAccountSubscriber {
                             requests.map((request, index) => 
                                 new Promise((resolve) => {
                                     setTimeout(async () => {
-                                        resolve(this.flatDeep(
-                                            await Promise.all(request.map(async (requestChunk) => 
+                                        console.log(index);
+                                        Promise.all(request.map((requestChunk) => 
+                                            new Promise((resolve) => {
                                                 //@ts-ignore 
-                                                (await axios.post(this.program.provider.connection._rpcEndpoint, requestChunk.map(payload => 
+                                                axios.post(this.program.provider.connection._rpcEndpoint, requestChunk.map(payload => 
                                                     ({
                                                         jsonrpc: "2.0",
                                                         id: "1",
@@ -151,10 +152,16 @@ export class PollingAccountSubscriber {
                                                             { commitment: "processed", },
                                                         ]
                                                     })
-                                                ))).data
-                                            )), 
-                                            Infinity
-                                        ));
+                                                )).then(response => {
+                                                    resolve(response.data);
+                                                });
+                                            }) 
+                                        )).then(responses => {
+                                            resolve(this.flatDeep(
+                                                responses, 
+                                                Infinity
+                                            ));
+                                        });
                                     }, index * 1000);
                                 })
                             )
