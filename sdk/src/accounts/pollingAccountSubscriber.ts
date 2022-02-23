@@ -138,7 +138,6 @@ export class PollingAccountSubscriber {
                             requests.map((request, index) => 
                                 new Promise((resolve) => {
                                     setTimeout(async () => {
-                                        console.log(index);
                                         Promise.all(request.map((requestChunk) => 
                                             new Promise((resolve) => {
                                                 //@ts-ignore 
