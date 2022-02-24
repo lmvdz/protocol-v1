@@ -5,6 +5,7 @@ interface AccountToPoll<T> {
     accountKey: string
     accountPublicKey: string
     onPoll: (data: any) => void
+    onError: (error: any) => void
     slot: number
     raw: string
     dataType: BufferEncoding
@@ -38,13 +39,13 @@ export class PollingAccountSubscriber {
         return this.pollingAccountMap.has(publicKey);
     }
 
-    addAccountToPoll(publicKey: string, accountKey: string, accountPublicKey: string, onPoll: (data : any) => void) : void {
+    addAccountToPoll(publicKey: string, accountKey: string, accountPublicKey: string, onPoll: (data : any) => void, onError: (error: any) => void) : void {
         let accountsToPoll = this.pollingAccountMap.get(publicKey);
         if (accountsToPoll === undefined) {
             accountsToPoll = new Map<string, AccountToPoll<any>>();
         }
         if (!accountsToPoll.has(accountKey)) {
-            accountsToPoll.set(accountKey, { accountKey, onPoll, accountPublicKey, raw: null, data: null } as AccountToPoll<any>);
+            accountsToPoll.set(accountKey, { accountKey, onPoll, onError, accountPublicKey, raw: null, data: null } as AccountToPoll<any>);
         }
         this.pollingAccountMap.set(publicKey, accountsToPoll);
     }
@@ -179,13 +180,13 @@ export class PollingAccountSubscriber {
                             const rpcResponse = rpcResponses[rpcResponseIndex];
                             const slot = (rpcResponse as any).result.context.slot;
                             
-                            let accIndex = index;
+                            let accIndex = index + x;
                             while (accIndex >= MAX_KEYS) {
                                 accIndex -= MAX_KEYS;
                             }
                             try {
-                                const raw: string = (rpcResponse as any).result.value[ accIndex + x ].data[0];
-                                const dataType = (rpcResponse as any).result.value[ accIndex + x ].data[1] as BufferEncoding;
+                                const raw: string = (rpcResponse as any).result.value[ accIndex ].data[0];
+                                const dataType = (rpcResponse as any).result.value[ accIndex ].data[1] as BufferEncoding;
                                 const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
                                     
                                 if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
@@ -201,7 +202,7 @@ export class PollingAccountSubscriber {
                                     accounts[x].onPoll(account);
                                 }
                             } catch (error) {
-                                console.error(error);
+                                accounts[x].onError(error);
                             }
 
                         }
@@ -247,7 +248,7 @@ export class PollingAccountSubscriber {
                                     accounts[x].onPoll(account);
                                 }
                             } catch(error) {
-                                console.error(error);
+                                accounts[x].onError(error);
                             }
                         }
                         index += flattenedAccounts[key]['accounts'].length;
