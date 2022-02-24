@@ -170,6 +170,7 @@ export class PollingAccountSubscriber {
                     );
 
                     let index = 0;
+                    
                     for (let x = 0; x < Object.keys(flattenedAccounts).length; x++) {
                         const key =  Object.keys(flattenedAccounts)[x];
                         const accounts = flattenedAccounts[key]['accounts'];
