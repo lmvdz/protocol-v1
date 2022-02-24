@@ -183,22 +183,27 @@ export class PollingAccountSubscriber {
                             while (accIndex >= MAX_KEYS) {
                                 accIndex -= MAX_KEYS;
                             }
-                            const raw: string = (rpcResponse as any).result.value[ accIndex + x ].data[0];
-                            const dataType = (rpcResponse as any).result.value[ accIndex + x ].data[1] as BufferEncoding;
-                            const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
-                                
-                            if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
-                                const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey );
-                                const newValue = { ...oldValue, slot, data: account, raw, dataType };
-                                // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
-                                if ( oldValue.data === null || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.raw !== newValue.raw )) {
-                                    // console.log('polled');
-                                    this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
-                                    newValue.onPoll(account);
+                            try {
+                                const raw: string = (rpcResponse as any).result.value[ accIndex + x ].data[0];
+                                const dataType = (rpcResponse as any).result.value[ accIndex + x ].data[1] as BufferEncoding;
+                                const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
+                                    
+                                if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
+                                    const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( flattenedAccounts[key]['accounts'][x].accountKey );
+                                    const newValue = { ...oldValue, slot, data: account, raw, dataType };
+                                    // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
+                                    if ( oldValue.data === null || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.raw !== newValue.raw )) {
+                                        // console.log('polled');
+                                        this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set(flattenedAccounts[key]['accounts'][x].accountKey, newValue);
+                                        newValue.onPoll(account);
+                                    }
+                                } else {
+                                    accounts[x].onPoll(account);
                                 }
-                            } else {
-                                accounts[x].onPoll(account);
+                            } catch (error) {
+                                console.error(error);
                             }
+
                         }
                         index += flattenedAccounts[key]['accounts'].length;
                     }
@@ -223,22 +228,26 @@ export class PollingAccountSubscriber {
                         const accounts = flattenedAccounts[key]['accounts'];
     
                         for (let x = 0; x < accounts.length; x++) {
-                            const raw: string = rpcResponse.result.value[ index + x ].data[0];
-                            const dataType = rpcResponse.result.value[ index + x ].data[1] as BufferEncoding;
-                            const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
-                            
-                            if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
-                                const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( accounts[x].accountKey );
-            
-                                const newValue = { ...oldValue, slot, data: account, raw, dataType };
-                                // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
-                                if (oldValue.data === null || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.raw !== newValue.raw)) {
-                                    // console.log('polled');
-                                    this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set( accounts[x].accountKey, newValue );
-                                    newValue.onPoll(account);
+                            try {
+                                const raw: string = rpcResponse.result.value[ index + x ].data[0];
+                                const dataType = rpcResponse.result.value[ index + x ].data[1] as BufferEncoding;
+                                const account = this.constructAccount(flattenedAccounts[key]['accounts'][x].accountKey, raw, dataType);
+                                
+                                if (this.pollingAccountMap.has(flattenedAccounts[key].publicKey)) {
+                                    const oldValue = this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).get( accounts[x].accountKey );
+                
+                                    const newValue = { ...oldValue, slot, data: account, raw, dataType };
+                                    // console.log('polling?', oldValue === undefined, oldValue.slot, newValue.slot, oldValue.data !== newValue.data);
+                                    if (oldValue.data === null || ((oldValue.slot === undefined || oldValue.slot < newValue.slot) && oldValue.raw !== newValue.raw)) {
+                                        // console.log('polled');
+                                        this.pollingAccountMap.get( flattenedAccounts[key].publicKey ).set( accounts[x].accountKey, newValue );
+                                        newValue.onPoll(account);
+                                    }
+                                } else {
+                                    accounts[x].onPoll(account);
                                 }
-                            } else {
-                                accounts[x].onPoll(account);
+                            } catch(error) {
+                                console.error(error);
                             }
                         }
                         index += flattenedAccounts[key]['accounts'].length;
