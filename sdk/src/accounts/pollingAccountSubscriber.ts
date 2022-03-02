@@ -138,7 +138,7 @@ export class PollingAccountSubscriber {
                         await Promise.all(
                             requests.map((request, index) => 
                                 new Promise((resolve) => {
-                                    setTimeout(async () => {
+                                    setTimeout(() => {
                                         Promise.all(request.map((requestChunk) => 
                                             new Promise((resolve) => {
                                                 //@ts-ignore 
@@ -222,6 +222,7 @@ export class PollingAccountSubscriber {
                           },
                         ],
                     }])).data[0];
+                    
                     const slot = rpcResponse.result.context.slot;
 
                     let index = 0;
